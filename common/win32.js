@@ -1,9 +1,9 @@
-const Struct = require('./struct');
-const GUID = require('./guid');
+import * as Struct from "./struct.js";
+import * as GUID from "./guid.js";
 
-var Abi = Process.arch == 'x64' ? 'win64' : 'stdcall';
+export var Abi = Process.arch == 'x64' ? 'win64' : 'stdcall';
 
-function FindHiddenExport(moduleName, procName) {
+export function FindHiddenExport(moduleName, procName) {
     var Kernel32 = {
         LoadLibrary: new NativeFunction(Module.findExportByName("kernel32.dll", "LoadLibraryW"), 'pointer', ['pointer'], Abi),
         GetProcAddress: new NativeFunction(Module.findExportByName("kernel32.dll", "GetProcAddress"), 'pointer', ['pointer', 'pointer'], Abi),
@@ -14,8 +14,8 @@ function FindHiddenExport(moduleName, procName) {
 }
 
 
-module.exports = {
-    // Microsoft APIs use stdcall on x86.
-    Abi: Abi,
-    FindHiddenExport: FindHiddenExport,
-};
+// module.exports = {
+//     // Microsoft APIs use stdcall on x86.
+//     Abi: Abi,
+//     FindHiddenExport: FindHiddenExport,
+// };

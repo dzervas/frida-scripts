@@ -1,11 +1,11 @@
-"use strict";
+// "use strict";
 
 // GOAL: Using the registered COM DotNetBridge.dll, build objects to represent a root namespace and contained types.
 
-const Win32 = require('./win32');
-const Struct = require('./struct');
-const GUID = require('./guid');
-const COM = require('./com');
+import * as Win32 from "./win32.js";
+import { Struct } from "./struct.js";
+import * as GUID from "./guid.js";
+import * as COM from "./com.js";
 
 function Warn(message) { if ("CLRDebug" in global) console.warn(message); }
 
@@ -35,12 +35,12 @@ function DotNetBridge() {
             throw new Error("Bad args " + params);
         }
     }
-    
+
     function DoCall(method) {
         var args = [];
         for (var i = 1; i < arguments.length; ++i) { args[i - 1] = arguments[i]; }
         var outPtr = new Struct({ 'value': 'pointer' });
-        args[args.length] = outPtr.Get();   
+        args[args.length] = outPtr.Get();
 
         COM.ThrowIfFailed(bridge[method].apply(bridge[method], args));
 
@@ -49,13 +49,13 @@ function DotNetBridge() {
         else if (ret && ret.__OBJECT) { ret = new ObjectWrapper(ret); }
         return ret;
     }
-    
+
     this.CreateObject = function(typeInfo, args) {
-        return typeInfo.IsDelegate ? 
+        return typeInfo.IsDelegate ?
             DoCall("CreateDelegate", Memory.allocUtf16String(typeInfo.TypeName), JsonDelegate(args)) :
             DoCall("CreateObject", Memory.allocUtf16String(typeInfo.TypeName), Memory.allocUtf16String(SerializedArgsToJson(args)));
     }
-    
+
     this.DescribeObject = function(typeName, objHandle) {
         if (typeof typeName === "string") {
             typeName = Memory.allocUtf16String(typeName);
@@ -66,20 +66,20 @@ function DotNetBridge() {
         }
         return DoCall("DescribeObject", typeName, objHandle);
     }
-    
+
     this.ReleaseObject = function(objHandle) {
         return DoCall("ReleaseObject", Memory.allocUtf16String(JSON.stringify(objHandle)));
     }
-    
+
     this.DescribeNamespace = function(namespaceName) {
         return DoCall("DescribeNamespace", Memory.allocUtf16String(namespaceName));
     }
-    
+
     this.InvokeMethod = function (objHandle, typeInfo, method, args, genericTypes, returnBoxed) {
-        return DoCall("InvokeMethod", 
-            objHandle == null ? NULL : Memory.allocUtf16String(JSON.stringify(objHandle)), 
-            Memory.allocUtf16String(typeInfo.TypeName), 
-            Memory.allocUtf16String(method), 
+        return DoCall("InvokeMethod",
+            objHandle == null ? NULL : Memory.allocUtf16String(JSON.stringify(objHandle)),
+            Memory.allocUtf16String(typeInfo.TypeName),
+            Memory.allocUtf16String(method),
             Memory.allocUtf16String(SerializedArgsToJson(args)),
             genericTypes ? Memory.allocUtf16String(JSON.stringify(genericTypes.$Clr_Handle)) : NULL,
             returnBoxed ? 1 : 0);
@@ -105,7 +105,7 @@ function JsonDelegate(func) {
         for (var i = 0; i < args.length; ++i) {
             if (args[i].__OBJECT) args[i] = new ObjectWrapper(args[i]);
         }
-        
+
         var ret = func.apply(func, args);
         // Pack up the result into object references
         if (Object.prototype.toString.call(ret) === '[object Array]') {
@@ -119,7 +119,7 @@ function JsonDelegate(func) {
         }
         return NULL;
     }, 'pointer', ['pointer'], Win32.Abi);
-    
+
     // Save a pointer somewhere in javascript, the GC is so quick it'll clean up before we have a chance to call back.
     _pinnedNativeCallbackObjects.push(callback);
     return callback;
@@ -134,13 +134,13 @@ function ExposeMethodsFromType(self, typeInfo) {
         invokeMethod.Of = function () {
             var genericTypes = new TypeWrapper("System.Array").CreateInstance(new TypeInstance("System.Type"), arguments.length);
             for (var i = 0; i < arguments.length; ++i) { genericTypes.SetValue(arguments[i].$Clr_TypeOf(), i); }
-            
+
             var invokeGenericMethod = function () { return self.$Clr_Invoke(method.Name, Array.prototype.slice.call(arguments, 0), genericTypes); }
             invokeGenericMethod.Box = function () { return self.$Clr_Invoke(method.Name, Array.prototype.slice.call(arguments, 0), genericTypes, true); }
             return invokeGenericMethod;
         };
         // Wire get_ and set_ to a property get/set.
-        if ((method.Name.startsWith("get_") && method.Parameters.length == 0) || 
+        if ((method.Name.startsWith("get_") && method.Parameters.length == 0) ||
             (method.Name.startsWith("set_") && method.Parameters.length == 1)) {
             try {
                 var shortMethodName = method.Name.slice("get_".length);
@@ -148,9 +148,9 @@ function ExposeMethodsFromType(self, typeInfo) {
                     get: function () { return self.$Clr_Invoke("get_" + shortMethodName, []); },
                     set: function (newValue) { return self.$Clr_Invoke("set_" + shortMethodName, [newValue]); },
                 });
-            } catch (e) { Warn("Can't define '" + shortMethodName + "': " + e); } 
+            } catch (e) { Warn("Can't define '" + shortMethodName + "': " + e); }
         // wire add_ and remove_ to an event registration object.
-        } else if ((method.Name.startsWith("add_") && method.Parameters && method.Parameters.length == 1) || 
+        } else if ((method.Name.startsWith("add_") && method.Parameters && method.Parameters.length == 1) ||
                     (method.Name.startsWith("remove_") && method.Parameters && method.Parameters.length == 1)) {
             var shortMethodName = method.Name.substring(method.Name.startsWith("add_") ? "add_".length : "remove_".length)
             if (!self[shortMethodName]) Object.defineProperty(self, shortMethodName, {
@@ -175,14 +175,14 @@ function ExposeMethodsFromType(self, typeInfo) {
             self[method.Name] = invokeMethod;
         }
     }
-    
+
     function ExposeField(self, name) {
         Object.defineProperty(self, name, {
             get: function () { return self.$Clr_Invoke(name, []); },
             set: function (value) { return self.$Clr_Invoke(name, [value]); },
         });
     }
-    
+
     for (var i = 0; typeInfo.Methods && i < typeInfo.Methods.length; ++i) { CreateMethod(self, typeInfo.Methods[i]); }
     for (var i = 0; typeInfo.Fields && i < typeInfo.Fields.length; ++i) { ExposeField(self, typeInfo.Fields[i]); }
 }
@@ -192,7 +192,7 @@ function TypeWrapper(typeNameOrTypeInfo) {
     if (typeof typeNameOrTypeInfo == "string") {
         typeInfo = BridgeExports.DescribeObject(typeNameOrTypeInfo, null);
     }
-    
+
     function ExposeNestedTypesFromType(self, typeInfo) {
         function CreateValue(self, name) {
             try {
@@ -244,7 +244,7 @@ function ObjectWrapper(objHandle) {
     _objects.push(this);
 }
 
-function NamespaceWrapper(namespaceName) {
+export function Namespace(namespaceName) {
     function CreateProperty(self, leafName, isType, callback) {
         try {
             var isSimplifiedName = leafName.indexOf("`") > -1;
@@ -252,7 +252,7 @@ function NamespaceWrapper(namespaceName) {
             Object.defineProperty(self, simpleLeafName, { get: function () { return callback(simpleLeafName, isType, isSimplifiedName); }});
         } catch (e) { Warn("Couldn't define " + leafName + " on " + namespaceName + ":\n" + e); }
     }
-    
+
     var namespaceInfo = BridgeExports.DescribeNamespace(namespaceName);
     for (var i = 0; i < namespaceInfo.length; ++i) {
         CreateProperty(this, namespaceInfo[i].Name, namespaceInfo[i].IsType,
@@ -269,22 +269,33 @@ function NamespaceWrapper(namespaceName) {
                         } else throw e;
                     }
                 } else {
-                    return new NamespaceWrapper(fullName);
+                    return new Namespace(fullName);
                 }
             });
     }
 }
 
-module.exports = {
-    Namespace: NamespaceWrapper,
-    Prune: function () { // Enable .net GC to clean up objects (remove reference in js and in .net).
-        var outstanding = _objects.length;
-        for (var i = outstanding - 1; i > -1; --i) BridgeExports.ReleaseObject(_objects[i].$Clr_Handle);
-        _objects.length = 0;
-        return outstanding;
-    },
-    Pin: function (obj) { // Prevent an object from being garbage collected.
-        _objects.splice(_objects.indexOf(obj), 1);
-        _pinnedObjects.push(obj);
-    },
-};
+export function Prune() { // Enable .net GC to clean up objects (remove reference in js and in .net).
+    var outstanding = _objects.length;
+    for (var i = outstanding - 1; i > -1; --i) BridgeExports.ReleaseObject(_objects[i].$Clr_Handle);
+    _objects.length = 0;
+    return outstanding;
+}
+export function Pin(obj) { // Prevent an object from being garbage collected.
+    _objects.splice(_objects.indexOf(obj), 1);
+    _pinnedObjects.push(obj);
+}
+
+// module.exports = {
+    // Namespace: NamespaceWrapper,
+    // Prune: function () { // Enable .net GC to clean up objects (remove reference in js and in .net).
+        // var outstanding = _objects.length;
+        // for (var i = outstanding - 1; i > -1; --i) BridgeExports.ReleaseObject(_objects[i].$Clr_Handle);
+        // _objects.length = 0;
+        // return outstanding;
+    // },
+    // Pin: function (obj) { // Prevent an object from being garbage collected.
+        // _objects.splice(_objects.indexOf(obj), 1);
+        // _pinnedObjects.push(obj);
+    // },
+// };

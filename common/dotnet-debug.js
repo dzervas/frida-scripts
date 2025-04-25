@@ -1,10 +1,10 @@
 "use strict";
-const CLR = require('./dotnet');
+import * as CLR from "./dotnet.js";
 const System = new CLR.Namespace("System");
 
 // Simple solution to getting output from System.Diagnostics.Trace.WriteLine.
 // Not optimal, but the alternative requires an assembly to load and inherit from TraceListener.
-function CreateTraceListenerThread() {
+export function EnableTraceListener() {
     var tracingThread = new System.Threading.Thread(new System.Threading.ThreadStart(function () {
         var traceBuffer = System.Array.CreateInstance(System.Byte.$Clr_TypeOf(), 1024 * 1024 * 1024);
         CLR.Pin(traceBuffer);
@@ -31,6 +31,6 @@ function CreateTraceListenerThread() {
     tracingThread.Start();
 }
 
-module.exports = {
-    EnableTraceListener: CreateTraceListenerThread,
-};
+// module.exports = {
+//     EnableTraceListener: CreateTraceListenerThread,
+// };

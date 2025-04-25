@@ -1,5 +1,5 @@
 
-var TypeMap = {
+export var TypeMap = {
     'pointer': [Process.pointerSize, Memory.readPointer, Memory.writePointer],
     'char': [1, Memory.readS8, Memory.writeS8], 'uchar': [1, Memory.readU8, Memory.writeU8],
     'int8': [1, Memory.readS8, Memory.writeS8], 'uint8': [1, Memory.readU8, Memory.writeU8],
@@ -12,7 +12,7 @@ var TypeMap = {
 };
 
 // Given a set of definitions, build an object with getters/setters around base_ptr.
-var Struct = function (structInfo) {
+export var Struct = function (structInfo) {
     function LookupType(stringType) {
         for (var type in TypeMap) { if (stringType == type) { return TypeMap[type]; } }
         throw Error("Didn't find " + JSON.stringify(stringType) + " in TypeMap");
@@ -52,5 +52,5 @@ var Struct = function (structInfo) {
     Object.defineProperty(this, "Size", { get: function () { return base_ptr_size; } });
 }
 
-module.exports = Struct;
-module.exports.TypeMap = TypeMap;
+// module.exports = Struct;
+// module.exports.TypeMap = TypeMap;

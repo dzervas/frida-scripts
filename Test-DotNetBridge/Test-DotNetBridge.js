@@ -3,14 +3,17 @@
 
 console.log("Begin");
 
-const localSettings = require('./local_settings');
+// const localSettings = require('./local_settings');
+import * as localSettings from "./local_settings.json";
 
 // Uncomment this line to enable warnings:
 //global.CLRDebug = true;
-const CLR = require('../common/DotNet');
+// const CLR = require('../common/DotNet');
+import * as CLR from "./common/dotnet.js";
 const System = new CLR.Namespace("System");
 
-const CLRDebug = require('../common/DotNet-debug');
+// const CLRDebug = require('../common/DotNet-debug');
+import * as CLRDebug from "./common/dotnet-debug.js";
 CLRDebug.EnableTraceListener();
 
 // Wait for the background thread to start.

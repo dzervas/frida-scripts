@@ -1,8 +1,8 @@
-const Struct = require('./struct');
-const GUID = require('./guid');
-const HSTRING = require('./hstring');
-const Win32 = require('./win32');
-const COM = require('./com');
+import * as Struct from "./struct.js";
+import * as GUID from "./guid.js";
+import * as HSTRING from "./hstring.js";
+import * as Win32 from "./win32.js";
+import * as COM from "./com.js";
 
 var ComBase = {
     RoInitialize: new NativeFunction(Win32.FindHiddenExport("combase.dll", "RoInitialize"), 'uint', ['uint'], Win32.Abi),

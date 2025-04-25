@@ -1,17 +1,17 @@
 "use strict";
 
-const Struct = require('./struct');
-const GUID = require('./guid');
-const Win32 = require('./win32');
+import { Struct } from "./struct.js";
+import * as GUID from "./guid.js";
+import * as Win32 from "./win32.js";
 
 var S_OK = 0;
 var S_FALSE = 1;
 var E_NOINTERFACE = 0x80004002;
 
-function Log(message) { if ("COMDebug" in global) console.log(message); }
-function Succeeded(hr) { return parseInt(hr, 10) == S_OK || parseInt(hr, 10) == S_FALSE; }
-function Failed(hr) { return !Succeeded(hr); }
-function ThrowIfFailed(hr) {
+export function Log(message) { if ("COMDebug" in global) console.log(message); }
+export function Succeeded(hr) { return parseInt(hr, 10) == S_OK || parseInt(hr, 10) == S_FALSE; }
+export function Failed(hr) { return !Succeeded(hr); }
+export function ThrowIfFailed(hr) {
     var HRESULTMap = [['E_ABORT', 0x80004004],
                        ['E_ACCESSDENIED', 0x80070005],
                        ['E_FAIL', 0x80004005],
@@ -22,7 +22,7 @@ function ThrowIfFailed(hr) {
                        ['E_OUTOFMEMORY', 0x8007000E],
                        ['E_POINTER', 0x80004003],
                        ['E_UNEXPECTED', 0x8000FFFF]];
-    
+
     if (Failed(hr)) {
         var friendlyStr = "";
         for (var i = 0; i < HRESULTMap.length; ++i) {
@@ -32,14 +32,14 @@ function ThrowIfFailed(hr) {
     }
 }
 
-var IUnknown = {
+export var IUnknown = {
     IID: GUID.alloc("00000000-0000-0000-C000-000000000046"),
     QueryInterface: [0, ['pointer', 'pointer']],
     AddRef: [1, []],
     Release: [2, []],
 };
 
-var IInspectable = {
+export var IInspectable = {
     IID: GUID.alloc("AF86E2E0-B12D-4c6a-9C5A-D7AA65101E90"),
     // IUnknown
     QueryInterface: IUnknown.QueryInterface,
@@ -51,23 +51,23 @@ var IInspectable = {
     GetTrustLevel: [5, ['pointer']],
 };
 
-var IAgileObject = new ComInterface(IUnknown, {
+export var IAgileObject = new Interface(IUnknown, {
     // Marker interface, it has no methods.
 }, "94EA2B94-E9CC-49E0-C0FF-EE64CA8F5B90");
 
-var Ole32 = {
+export var Ole32 = {
     CoInitializeEx: new NativeFunction(Module.findExportByName("Ole32.dll", "CoInitializeEx"), 'uint', ['pointer', 'uint'], Win32.Abi),
     CoCreateInstance: new NativeFunction(Module.findExportByName("Ole32.dll", "CoCreateInstance"), 'uint', ['pointer', 'pointer', 'uint', 'pointer', 'pointer'], Win32.Abi),
 };
 
-function ComInterface(baseInterface, methods, iid_str) {
+export function Interface(baseInterface, methods, iid_str) {
     for (var method in methods) this[method] = methods[method];
 
     this.IID = GUID.alloc(iid_str);
     if (baseInterface.IID == IInspectable.IID) this.IInspectable = true;
 }
 
-function iunknown_ptr(address, idl) {
+export function iunknown_ptr(address, idl) {
     function vtable_wrapper(address) {
         var getMethodAddress = function (ordinal) {
             var addr = Memory.readPointer(address); // vtbl
@@ -78,13 +78,13 @@ function iunknown_ptr(address, idl) {
         this.Invoke = function (ordinal, paramTypes, params, tagName) {
             if (address == 0x0) { throw Error("Can't invoke method on null pointer"); }
             Log("com_ptr(" + address + ")->" + tagName + " (" + params + ")");
-            
+
             // Add 'this' as first argument
             var localTypes = paramTypes.slice();
             localTypes.unshift('pointer');
             var localParams = params.slice();
             localParams.unshift(address);
-            
+
             var fn = new NativeFunction(getMethodAddress(ordinal), 'uint', localTypes, Win32.Abi);
             return fn.apply(fn, localParams);
         };
@@ -140,7 +140,7 @@ function iunknown_ptr(address, idl) {
     }
 }
 
-function com_ptr(idl) {
+export function com_ptr(idl) {
     var _ptr = new Struct({ 'value': 'pointer' }); // the real reference is here
 
     var resolve_ptr = function () { return new iunknown_ptr(_ptr.value, idl); }
@@ -187,7 +187,7 @@ function com_ptr(idl) {
     for (var method in idl) { CreateMethod(method); }
 }
 
-function RuntimeComObject(iid) {
+export function RuntimeObject(iid) {
     var vtable_entries = [];
     var iids = [IUnknown.IID, IAgileObject.IID, iid];
     var refCount = 1;
@@ -208,7 +208,7 @@ function RuntimeComObject(iid) {
 
         var com_object_pointer = new Struct({ 'value': 'pointer' });
         com_object_pointer.value = vTable;
-        
+
         // Avoid garbage collection:
         this.savedvTable = vTable;
         this.savedAddress = com_object_pointer;
@@ -235,30 +235,47 @@ function RuntimeComObject(iid) {
     this.AddEntry(function (this_ptr) { return --refCount; }, 'ulong', ['pointer']);
 }
 
-module.exports = {
-    S_OK: S_OK,
-    ApartmentType: { // COINIT
-        STA: 0x2,
-        MTA: 0x0
-    },
-    ClassContext: { // CLSCTX
-        InProc: 0x1,
-        Local: 0x4,
-    },
-    IUnknown: IUnknown,
-    IInspectable: IInspectable,
-    Pointer: com_ptr,
-    Interface: ComInterface,
-    RuntimeObject: RuntimeComObject,
-    Succeeded: Succeeded,
-    Failed: Failed,
-    ThrowIfFailed: ThrowIfFailed,
-    CreateInstance: function (clsid, clsctx, idl) {
-        var ret = new com_ptr(idl);
-        ThrowIfFailed(Ole32.CoCreateInstance(clsid, NULL, clsctx, idl.IID, ret.GetAddressOf()));
-        return ret;
-    },
-    Initialize: function (apartment) {
-        ThrowIfFailed(Ole32.CoInitializeEx(NULL, apartment));
-    },
+export var ApartmentType = { // COINIT
+    STA: 0x2,
+    MTA: 0x0
+};
+export var ClassContext = { // CLSCTX
+    InProc: 0x1,
+    Local: 0x4,
+};
+export function CreateInstance(clsid, clsctx, idl) {
+    var ret = new com_ptr(idl);
+    ThrowIfFailed(Ole32.CoCreateInstance(clsid, NULL, clsctx, idl.IID, ret.GetAddressOf()));
+    return ret;
 }
+export function Initialize(apartment) {
+    ThrowIfFailed(Ole32.CoInitializeEx(NULL, apartment));
+}
+
+// module.exports = {
+//     S_OK: S_OK,
+//     ApartmentType: { // COINIT
+//         STA: 0x2,
+//         MTA: 0x0
+//     },
+//     ClassContext: { // CLSCTX
+//         InProc: 0x1,
+//         Local: 0x4,
+//     },
+//     IUnknown: IUnknown,
+//     IInspectable: IInspectable,
+//     Pointer: com_ptr,
+//     Interface: Interface,
+//     RuntimeObject: RuntimeObject,
+//     Succeeded: Succeeded,
+//     Failed: Failed,
+//     ThrowIfFailed: ThrowIfFailed,
+//     CreateInstance: function (clsid, clsctx, idl) {
+//         var ret = new com_ptr(idl);
+//         ThrowIfFailed(Ole32.CoCreateInstance(clsid, NULL, clsctx, idl.IID, ret.GetAddressOf()));
+//         return ret;
+//     },
+//     Initialize: function (apartment) {
+//         ThrowIfFailed(Ole32.CoInitializeEx(NULL, apartment));
+//     },
+// }

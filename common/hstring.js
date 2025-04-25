@@ -1,6 +1,6 @@
-const Struct = require('./struct');
-const COM = require('./com');
-const Win32 = require('./win32');
+import * as Struct from "./struct.js";
+import * as COM from "./com.js";
+import * as Win32 from "./win32.js";
 
 var ComBase = {
     WindowsCreateString: new NativeFunction(Win32.FindHiddenExport("combase.dll", "WindowsCreateString"), 'uint', ['pointer', 'uint', 'pointer'], Win32.Abi),
